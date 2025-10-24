@@ -15,6 +15,7 @@ contract FileRegistry {
     struct FileRecord {
         address owner;
         string cid; // IPFS CID for the encrypted file
+        string fileType; // file type
         string encKeyOwner; // encrypted AES key for the owner (MetaMask format)
     }
 
@@ -36,8 +37,17 @@ contract FileRegistry {
     // fileId => requester => requester MetaMask encryption public key (string)
     mapping(uint256 => mapping(address => string)) public pendingRequests;
 
-    event FileUploaded(uint256 indexed fileId, address indexed owner, string cid, string encKeyOwner);
-    event AccessRequested(uint256 indexed fileId, address indexed requester, string requesterEncPubKey);
+    event FileUploaded(
+        uint256 indexed fileId,
+        address indexed owner,
+        string cid,
+        string encKeyOwner
+    );
+    event AccessRequested(
+        uint256 indexed fileId,
+        address indexed requester,
+        string requesterEncPubKey
+    );
     event AccessApproved(
         uint256 indexed fileId,
         address indexed owner,
@@ -51,7 +61,11 @@ contract FileRegistry {
      * @param encKeyOwner Encrypted AES file key for the owner (MetaMask-compatible string)
      * @return fileId Newly assigned file id
      */
-    function uploadFile(string calldata cid, string calldata encKeyOwner) external returns (uint256 fileId) {
+    function uploadFile(
+        string calldata cid,
+        string calldata fileType,
+        string calldata encKeyOwner
+    ) external returns (uint256 fileId) {
         require(bytes(cid).length != 0, "CID required");
         require(bytes(encKeyOwner).length != 0, "Owner key required");
 
@@ -59,7 +73,12 @@ contract FileRegistry {
             fileId = ++nextFileId;
         }
 
-        files[fileId] = FileRecord({ owner: msg.sender, cid: cid, encKeyOwner: encKeyOwner });
+        files[fileId] = FileRecord({
+            owner: msg.sender,
+            cid: cid,
+            fileType: fileType,
+            encKeyOwner: encKeyOwner
+        });
         ownerFileIds[msg.sender].push(fileId);
 
         emit FileUploaded(fileId, msg.sender, cid, encKeyOwner);
@@ -70,7 +89,10 @@ contract FileRegistry {
      * @param fileId Target file id
      * @param requesterEncPubKey The requester's MetaMask encryption public key (string)
      */
-    function requestAccess(uint256 fileId, string calldata requesterEncPubKey) external {
+    function requestAccess(
+        uint256 fileId,
+        string calldata requesterEncPubKey
+    ) external {
         FileRecord memory rec = files[fileId];
         require(rec.owner != address(0), "Invalid file");
         require(bytes(requesterEncPubKey).length != 0, "PubKey required");
@@ -117,18 +139,25 @@ contract FileRegistry {
     /**
      * @notice Get the list of file ids owned by an address.
      */
-    function getOwnerFiles(address owner) external view returns (uint256[] memory) {
+    function getOwnerFiles(
+        address owner
+    ) external view returns (uint256[] memory) {
         return ownerFileIds[owner];
     }
 
     /**
      * @notice Get all grantees for a file id. UI helper.
      */
-    function getGrantees(uint256 fileId) external view returns (address[] memory) {
+    function getGrantees(
+        uint256 fileId
+    ) external view returns (address[] memory) {
         return grantees[fileId];
     }
 
-    function _isGrantee(uint256 fileId, address user) private view returns (bool) {
+    function _isGrantee(
+        uint256 fileId,
+        address user
+    ) private view returns (bool) {
         address[] memory list = grantees[fileId];
         for (uint256 i = 0; i < list.length; i++) {
             if (list[i] == user) return true;
@@ -136,4 +165,3 @@ contract FileRegistry {
         return false;
     }
 }
-

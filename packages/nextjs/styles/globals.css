@@ -121,3 +121,34 @@
 .link:hover {
   opacity: 80%;
 }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.25s ease-out forwards;
+}
+
+/* Hover animated lock: morph closed→open repeatedly while hovered */
+.hover-animate-lock .unlocked { opacity: 0; transform: rotate(-10deg) scale(0.95); transition: all 0.3s ease; }
+.hover-animate-lock .locked   { opacity: 1; transform: rotate(0deg)    scale(1);    transition: all 0.3s ease; }
+
+.hover-animate-lock:hover .unlocked { opacity: 1; transform: rotate(0deg) scale(1); animation: lockPulse 1.2s ease-in-out infinite; }
+.hover-animate-lock:hover .locked   { opacity: 0; transform: rotate(10deg) scale(1.05); }
+
+@keyframes lockPulse {
+  0%   { transform: scale(1) rotate(0deg); }
+  50%  { transform: scale(1.08) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}

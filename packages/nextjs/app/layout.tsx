@@ -1,4 +1,6 @@
+import "@cyntler/react-doc-viewer/dist/index.css";
 import "@rainbow-me/rainbowkit/styles.css";
+import { PdfInit } from "~~/components/PdfInit";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
@@ -14,6 +16,7 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
     <html suppressHydrationWarning className={``}>
       <body>
         <ThemeProvider enableSystem>
+          <PdfInit />
           <ScaffoldEthAppWithProviders>{children}</ScaffoldEthAppWithProviders>
         </ThemeProvider>
       </body>

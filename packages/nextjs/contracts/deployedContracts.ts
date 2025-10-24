@@ -78,6 +78,11 @@ const deployedContracts = {
               internalType: "string",
             },
             {
+              name: "fileType",
+              type: "string",
+              internalType: "string",
+            },
+            {
               name: "encKeyOwner",
               type: "string",
               internalType: "string",
@@ -219,6 +224,11 @@ const deployedContracts = {
           inputs: [
             {
               name: "cid",
+              type: "string",
+              internalType: "string",
+            },
+            {
+              name: "fileType",
               type: "string",
               internalType: "string",
             },
