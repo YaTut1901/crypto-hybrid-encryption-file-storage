@@ -132,8 +132,7 @@ const FileDetails: React.FC<{
             setAuthorized(isAuthorized);
 
             if (isAuthorized) {
-              const gw = process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? "https://gateway.pinata.cloud/ipfs";
-              fetch(`${gw}/${cid}`)
+              fetch(`/api/ipfs?cid=${cid}`)
                 .then(r => r.blob())
                 .then(blob => {
                   const keyString = isOwner
