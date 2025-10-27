@@ -7,9 +7,8 @@ pragma solidity ^0.8.19;
  *         Stores IPFS CIDs and encrypted AES keys for the owner and approved grantees.
  *
  * Design notes:
- *  - `encKeyOwner` and `encKeyForUser` values are opaque strings produced on the client
- *    using MetaMask's x25519 encryption format (hex-encoded JSON acceptable).
- *  - `pendingRequests` stores the requester's MetaMask encryption public key as a string.
+ *  - `encKeyOwner` value is an opaque string produced on the client using Lit Protocol encryption format.
+ *  - `pendingRequests` stores the requester's address.
  */
 contract FileRegistry {
     struct FileRecord {
@@ -25,17 +24,11 @@ contract FileRegistry {
     // fileId => record
     mapping(uint256 => FileRecord) public files;
 
-    // fileId => user => encrypted AES key for that user
-    mapping(uint256 => mapping(address => string)) public encKeyForUser;
+    // fileId => encrypted AES key for the user
+    mapping(uint256 => mapping(address => string)) public encKeyForRequester;
 
-    // Optional helper for UI: list grantees per file
-    mapping(uint256 => address[]) public grantees;
-
-    // Owner to list of owned fileIds
-    mapping(address => uint256[]) public ownerFileIds;
-
-    // fileId => requester => requester MetaMask encryption public key (string)
-    mapping(uint256 => mapping(address => string)) public pendingRequests;
+    // fileId => requester
+    mapping(uint256 => mapping(address => bool)) public pendingRequests;
 
     event FileUploaded(
         uint256 indexed fileId,
@@ -45,8 +38,7 @@ contract FileRegistry {
     );
     event AccessRequested(
         uint256 indexed fileId,
-        address indexed requester,
-        string requesterEncPubKey
+        address indexed requester
     );
     event AccessApproved(
         uint256 indexed fileId,
@@ -79,89 +71,49 @@ contract FileRegistry {
             fileType: fileType,
             encKeyOwner: encKeyOwner
         });
-        ownerFileIds[msg.sender].push(fileId);
 
         emit FileUploaded(fileId, msg.sender, cid, encKeyOwner);
     }
 
     /**
-     * @notice Request access to a file by submitting your MetaMask encryption public key.
+     * @notice Request access to a file.
      * @param fileId Target file id
-     * @param requesterEncPubKey The requester's MetaMask encryption public key (string)
      */
     function requestAccess(
-        uint256 fileId,
-        string calldata requesterEncPubKey
+        uint256 fileId
     ) external {
         FileRecord memory rec = files[fileId];
         require(rec.owner != address(0), "Invalid file");
-        require(bytes(requesterEncPubKey).length != 0, "PubKey required");
 
-        pendingRequests[fileId][msg.sender] = requesterEncPubKey;
+        if (pendingRequests[fileId][msg.sender]) {
+            revert("Request already pending");
+        }
 
-        emit AccessRequested(fileId, msg.sender, requesterEncPubKey);
+        pendingRequests[fileId][msg.sender] = true;
+
+        emit AccessRequested(fileId, msg.sender);
     }
 
     /**
-     * @notice Approve access for a requester by storing the AES key encrypted to their pubkey.
+     * @notice Approve access for a requester.
      * @dev Only the file owner can approve. Optionally clears any pending request entry.
      * @param fileId Target file id
      * @param requester Address to grant access
-     * @param encKeyForRequester The AES key encrypted to the requester's MetaMask encryption pubkey
      */
     function approveAccess(
         uint256 fileId,
         address requester,
-        string calldata encKeyForRequester
+        string calldata _encKeyForRequester
     ) external {
         FileRecord memory rec = files[fileId];
         require(rec.owner != address(0), "Invalid file");
         require(rec.owner == msg.sender, "Only owner");
         require(requester != address(0), "Bad requester");
-        require(bytes(encKeyForRequester).length != 0, "Key required");
 
-        // Store the encrypted key for the requester
-        encKeyForUser[fileId][requester] = encKeyForRequester;
+        pendingRequests[fileId][requester] = false;
 
-        // Maintain grantee list if first time approval
-        if (!_isGrantee(fileId, requester)) {
-            grantees[fileId].push(requester);
-        }
+        encKeyForRequester[fileId][requester] = _encKeyForRequester;
 
-        // Clear pending request if present (best-effort)
-        if (bytes(pendingRequests[fileId][requester]).length != 0) {
-            delete pendingRequests[fileId][requester];
-        }
-
-        emit AccessApproved(fileId, msg.sender, requester, encKeyForRequester);
-    }
-
-    /**
-     * @notice Get the list of file ids owned by an address.
-     */
-    function getOwnerFiles(
-        address owner
-    ) external view returns (uint256[] memory) {
-        return ownerFileIds[owner];
-    }
-
-    /**
-     * @notice Get all grantees for a file id. UI helper.
-     */
-    function getGrantees(
-        uint256 fileId
-    ) external view returns (address[] memory) {
-        return grantees[fileId];
-    }
-
-    function _isGrantee(
-        uint256 fileId,
-        address user
-    ) private view returns (bool) {
-        address[] memory list = grantees[fileId];
-        for (uint256 i = 0; i < list.length; i++) {
-            if (list[i] == user) return true;
-        }
-        return false;
+        emit AccessApproved(fileId, msg.sender, requester, _encKeyForRequester);
     }
 }

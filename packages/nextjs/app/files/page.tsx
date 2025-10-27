@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import DocViewer, { DocViewerRenderers, IDocument } from "@cyntler/react-doc-viewer";
 import { Abi, AbiEvent } from "abitype";
-import { PublicClient } from "viem";
-import { useAccount, useBlockNumber, usePublicClient } from "wagmi";
+import { PublicClient, WalletClient } from "viem";
+import { useAccount, useBlockNumber, usePublicClient, useWalletClient } from "wagmi";
 import { ArrowUpTrayIcon } from "@heroicons/react/24/outline";
 import { DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { LockClosedIcon, LockOpenIcon } from "@heroicons/react/24/solid";
@@ -17,7 +17,14 @@ import { BlockieAvatar } from "~~/components/scaffold-eth/BlockieAvatar";
 import { useDeployedContractInfo, useSelectedNetwork } from "~~/hooks/scaffold-eth";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
-import { AesEncryptedFile, decryptFileWithAes, encryptFileWithAes } from "~~/utils/upload/client";
+import {
+  AesEncryptedFile,
+  EncryptedKey,
+  decryptFileWithAes,
+  decryptKeyWithLit,
+  encryptFileWithAes,
+  encryptKeyWithLit,
+} from "~~/utils/upload/client";
 import { PinataUploadResult } from "~~/utils/upload/server";
 
 const FileDetails: React.FC<{
@@ -27,6 +34,7 @@ const FileDetails: React.FC<{
   publicClient: PublicClient;
   abi?: Abi;
 }> = ({ fileId, cid, contractAddress, publicClient, abi }) => {
+  const { data: walletClient } = useWalletClient();
   const { address: connectedAddress } = useAccount();
   const [granteeLogs, setGranteeLogs] = useState<any[]>([]);
   const [requestedLogs, setRequestedLogs] = useState<any[]>([]);
@@ -38,25 +46,46 @@ const FileDetails: React.FC<{
 
   const handleRequestAccess = async (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    try {
-      await writeFileRegistryAsync({
-        functionName: "requestAccess",
-        args: [fileId, "dummy-requester-enc-pubkey"],
+
+    writeFileRegistryAsync({
+      functionName: "requestAccess",
+      args: [fileId],
+    })
+      .then(() => {
+        console.log("Access requested successfully");
+      })
+      .catch(err => {
+        console.error("requestAccess failed", err);
       });
-    } catch (err) {
-      console.error("requestAccess failed", err);
-    }
   };
 
   const handleApproveRequest = async (requester: string) => {
-    try {
-      await writeFileRegistryAsync({
-        functionName: "approveAccess",
-        args: [fileId, requester, fileDetails[3]],
+    decryptKeyWithLit(fileDetails[3], walletClient as WalletClient)
+      .then(decryptedKey => {
+        encryptKeyWithLit(decryptedKey, requester)
+          .then(encryptedKeyForRequester => {
+            writeFileRegistryAsync({
+              functionName: "approveAccess",
+              args: [
+                fileId,
+                requester,
+                `${encryptedKeyForRequester.ciphertext}:${encryptedKeyForRequester.dataToEncryptHash}`,
+              ],
+            })
+              .then(() => {
+                console.log("Access approved successfully");
+              })
+              .catch(err => {
+                console.error("approveAccess failed", err);
+              });
+          })
+          .catch(err => {
+            console.error("encryptKeyWithLit failed", err);
+          });
+      })
+      .catch(err => {
+        console.error("decryptKeyWithLit failed", err);
       });
-    } catch (err) {
-      console.error("approveAccess failed", err);
-    }
   };
 
   useEffect(() => {
@@ -114,10 +143,20 @@ const FileDetails: React.FC<{
                       ).args.encKeyForRequester;
 
                   if (keyString) {
-                    decryptFileWithAes(blob, keyString, fileDetails[2]).then((decryptedFile: File) => {
-                      const url = URL.createObjectURL(decryptedFile);
-                      setDocs([{ uri: url }]);
-                    });
+                    decryptKeyWithLit(keyString, walletClient as WalletClient)
+                      .then(decryptedKey => {
+                        decryptFileWithAes(blob, decryptedKey, fileDetails[2])
+                          .then((decryptedFile: File) => {
+                            const url = URL.createObjectURL(decryptedFile);
+                            setDocs([{ uri: url }]);
+                          })
+                          .catch(err => {
+                            console.error("decryptFileWithAes failed", err);
+                          });
+                      })
+                      .catch(err => {
+                        console.error("decryptKeyWithLit failed", err);
+                      });
                   }
                 })
                 .catch(console.error);
@@ -125,7 +164,6 @@ const FileDetails: React.FC<{
           });
       });
 
-    // Also fetch AccessRequested to compute pending approvals
     publicClient
       .getLogs({
         address: contractAddress,
@@ -408,32 +446,39 @@ const FilesPage = () => {
         console.log("File successfully encrypted, uploading to IPFS...");
         callUploadBackend(encryptedFile.file)
           .then(async (result: PinataUploadResult) => {
-            console.log("File successfully uploaded to IPFS, populating data to contract...");
-            writeContractAsync({
-              functionName: "uploadFile",
-              args: [result.cid, file.type, encryptedFile.key],
-            })
-              .then(async () => {
-                console.log("File data successfully populated to contract");
-              })
-              .catch(async err => {
-                console.error("Failed to populate file data to contract: ", err);
-                console.log("Deleting file from IPFS...");
-                callDeleteBackend(result.id)
+            console.log("File successfully uploaded to IPFS, encrypting  AES key with Lit...");
+            encryptKeyWithLit(encryptedFile.key, connected as `0x${string}`)
+              .then(async (encryptedKey: EncryptedKey) => {
+                console.log("AES key successfully encrypted with Lit, populating file data to contract...");
+                writeContractAsync({
+                  functionName: "uploadFile",
+                  args: [result.cid, file.type, `${encryptedKey.ciphertext}:${encryptedKey.dataToEncryptHash}`],
+                })
                   .then(async () => {
-                    console.log("File successfully deleted from IPFS");
+                    console.log("File data successfully populated to contract");
                   })
-                  .catch(err => {
-                    console.error("Failed to delete file from IPFS: ", err);
+                  .catch(async err => {
+                    console.error("Failed to populate file data to contract: ", err);
+                    console.log("Deleting file from IPFS...");
+                    callDeleteBackend(result.id)
+                      .then(async () => {
+                        console.log("File successfully deleted from IPFS");
+                      })
+                      .catch(err => {
+                        console.error("Failed to delete file from IPFS: ", err);
+                      });
                   });
+              })
+              .catch(err => {
+                console.error("Failed to upload file to IPFS: ", err);
               });
           })
           .catch(err => {
-            console.error("Failed to upload file to IPFS: ", err);
+            console.error("Failed to encrypt AES key with Lit: ", err);
           });
       })
       .catch(err => {
-        console.error("Encryption error: ", err);
+        console.error("AES Encryption error: ", err);
       });
   };
 
