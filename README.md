@@ -5,9 +5,11 @@ Securely share encrypted documents on IPFS with on-chain access control built on
 <div align="center">
   <!-- GitHub renders MP4s linked via markdown image syntax as an inline video player -->
   
-  [![Watch the demo](./thumbnail.jpg)](./1-2025-10-27_15.06.11.mp4)
+  ![Demo walkthrough](./demo.gif)
   
-  <p><em>Click to play the end-to-end demo – upload, request and grant access in less than a minute.</em></p>
+  <!-- Fallback: link to high-res MP4 if you prefer → 1-2025-10-27_15.06.11.mp4 -->
+  
+  <p><em>End-to-end demo – upload, request and grant access in less than a minute.</em></p>
 </div>
 
 ---
