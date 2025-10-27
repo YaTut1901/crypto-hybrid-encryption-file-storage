@@ -3,8 +3,11 @@
 Securely share encrypted documents on IPFS with on-chain access control built on **Scaffold-ETH 2**.
 
 <div align="center">
-  <video src="1-2025-10-27_15.06.11.mp4" controls width="600"></video>
-  <p><em>End-to-end demo – upload, request and grant access in less than a minute.</em></p>
+  <!-- GitHub renders MP4s linked via markdown image syntax as an inline video player -->
+  
+  [![Watch the demo](./thumbnail.jpg)](./1-2025-10-27_15.06.11.mp4)
+  
+  <p><em>Click to play the end-to-end demo – upload, request and grant access in less than a minute.</em></p>
 </div>
 
 ---
