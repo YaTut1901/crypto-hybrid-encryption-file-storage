@@ -107,7 +107,4 @@ Create `packages/nextjs/.env.local`:
 ```bash
 # Pinata
 PINATA_JWT=eyJhbGciOiJIUzI1NiIsInR…
-
-# Lit Protocol (optional server key)
-NEXT_PUBLIC_LIT_RELAY_API_KEY=…
 ```
